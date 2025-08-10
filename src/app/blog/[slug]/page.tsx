@@ -1,22 +1,31 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
-import { Typography, Box } from "@mui/material";
-import ShareButtons from "@/app/blog/[slug]/ShareButtons"; // client component
-import { blogPosts } from "@/app/lib/blogPosts";
+import { Box, Typography } from "@mui/material";
+import ShareButtons from "./ShareButtons";
 
-export function generateStaticParams() {
-  return blogPosts.map((post) => ({
-    slug: post.slug,
-  }));
+const API_URL = process.env.API_URL!;
+
+export const revalidate = 300;
+
+async function getPost(slug: string) {
+  const res = await fetch(`${API_URL}/blogs/${slug}`, { next: { revalidate } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error("Failed to fetch post");
+  return res.json() as Promise<{
+    title: string;
+    date: string;
+    readTime: string;
+    image: string;
+    description: string;
+  }>;
 }
 
 export default async function BlogPostPage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: { slug: string };
 }) {
-  const { slug } = await params;
-  const post = blogPosts.find((p) => p.slug === slug);
+  const post = await getPost(params.slug);
   if (!post) return notFound();
 
   const lines = (post.description || "").split("\n");
@@ -34,9 +43,8 @@ export default async function BlogPostPage({
       >
         {post.date} • {post.readTime}
       </Typography>
-
       <Image
-        src={post.image} // works with string (/public) or imported image
+        src={post.image}
         alt={post.title}
         width={1600}
         height={900}
@@ -46,9 +54,7 @@ export default async function BlogPostPage({
           borderRadius: 12,
           marginBottom: 24,
         }}
-        priority
       />
-
       <Box sx={{ mb: 4 }}>
         {lines.map((line, i) => {
           const t = line.trim();
@@ -66,7 +72,7 @@ export default async function BlogPostPage({
           }
           const boldParts = t.split(/\*\*(.*?)\*\*/g);
           return (
-            <Typography key={i} variant="body1" sx={{ mb: 2, lineHeight: 1.8 }}>
+          <Typography key={i} variant="body1" sx={{ mb: 2, lineHeight: 1.8 }}>
               {boldParts.map((part, j) =>
                 j % 2 ? (
                   <strong key={j}>{part}</strong>
@@ -74,7 +80,7 @@ export default async function BlogPostPage({
                   <span key={j}>{part}</span>
                 )
               )}
-            </Typography>
+          </Typography>
           );
         })}
       </Box>
